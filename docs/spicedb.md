@@ -88,7 +88,7 @@ spicedb datastore gc [flags]
       --datastore-connection-balancing                                        enable connection balancing between database nodes (CockroachDB driver only) (default true)
       --datastore-credentials-provider-name string                            retrieve datastore credentials dynamically using ("aws-iam")
       --datastore-disable-watch-support                                       disable watch support (only enable if you absolutely do not need watch)
-      --datastore-engine string                                               type of datastore to initialize ("cockroachdb", "mysql", "postgres", "spanner") (default "memory")
+      --datastore-engine string                                               type of datastore to initialize ("cockroachdb", "mongodb", "mysql", "postgres", "spanner") (default "memory")
       --datastore-experimental-column-optimization                            enable experimental column optimization (default true)
       --datastore-follower-read-delay-duration duration                       amount of time to subtract from non-sync revision timestamps to ensure they are sufficiently in the past to enable follower reads (CockroachDB and Spanner drivers only) or read replicas (Postgres and MySQL drivers only) (default 4.8s)
       --datastore-gc-interval duration                                        amount of time between passes of garbage collection (Postgres driver only) (default 3m0s)
@@ -161,7 +161,7 @@ spicedb datastore head [flags]
 ### Options
 
 ```
-      --datastore-engine string        type of datastore to initialize ("cockroachdb", "mysql", "postgres", "spanner") (default "postgres")
+      --datastore-engine string        type of datastore to initialize ("cockroachdb", "mongodb", "mysql", "postgres", "spanner") (default "postgres")
       --otel-endpoint string           OpenTelemetry collector endpoint - the endpoint can also be set by using enviroment variables
       --otel-insecure                  connect to the OpenTelemetry collector in plaintext
       --otel-provider string           OpenTelemetry provider for tracing ("none", "otlphttp", "otlpgrpc") (default "none")
@@ -197,7 +197,7 @@ spicedb datastore migrate [revision] [flags]
 ```
       --datastore-conn-uri string                    connection string used by remote datastores (e.g. "postgres://postgres:password@localhost:5432/spicedb")
       --datastore-credentials-provider-name string   retrieve datastore credentials dynamically using ("aws-iam")
-      --datastore-engine string                      type of datastore to initialize ("cockroachdb", "mysql", "postgres", "spanner") (default "memory")
+      --datastore-engine string                      type of datastore to initialize ("cockroachdb", "mongodb", "mysql", "postgres", "spanner") (default "memory")
       --datastore-mysql-table-prefix string          prefix to add to the name of all mysql database tables
       --datastore-spanner-credentials string         path to service account key credentials file with access to the cloud spanner instance (omit to use application default credentials)
       --datastore-spanner-emulator-host string       URI of spanner emulator instance used for development and testing (e.g. localhost:9010)
@@ -257,7 +257,7 @@ spicedb datastore repair [flags]
       --datastore-connection-balancing                                        enable connection balancing between database nodes (CockroachDB driver only) (default true)
       --datastore-credentials-provider-name string                            retrieve datastore credentials dynamically using ("aws-iam")
       --datastore-disable-watch-support                                       disable watch support (only enable if you absolutely do not need watch)
-      --datastore-engine string                                               type of datastore to initialize ("cockroachdb", "mysql", "postgres", "spanner") (default "memory")
+      --datastore-engine string                                               type of datastore to initialize ("cockroachdb", "mongodb", "mysql", "postgres", "spanner") (default "memory")
       --datastore-experimental-column-optimization                            enable experimental column optimization (default true)
       --datastore-follower-read-delay-duration duration                       amount of time to subtract from non-sync revision timestamps to ensure they are sufficiently in the past to enable follower reads (CockroachDB and Spanner drivers only) or read replicas (Postgres and MySQL drivers only) (default 4.8s)
       --datastore-gc-interval duration                                        amount of time between passes of garbage collection (Postgres driver only) (default 3m0s)
@@ -418,7 +418,7 @@ spicedb serve [flags]
       --datastore-connection-balancing                                                  enable connection balancing between database nodes (CockroachDB driver only) (default true)
       --datastore-credentials-provider-name string                                      retrieve datastore credentials dynamically using ("aws-iam")
       --datastore-disable-watch-support                                                 disable watch support (only enable if you absolutely do not need watch)
-      --datastore-engine string                                                         type of datastore to initialize ("cockroachdb", "mysql", "postgres", "spanner") (default "memory")
+      --datastore-engine string                                                         type of datastore to initialize ("cockroachdb", "mongodb", "mysql", "postgres", "spanner") (default "memory")
       --datastore-experimental-column-optimization                                      enable experimental column optimization (default true)
       --datastore-follower-read-delay-duration duration                                 amount of time to subtract from non-sync revision timestamps to ensure they are sufficiently in the past to enable follower reads (CockroachDB and Spanner drivers only) or read replicas (Postgres and MySQL drivers only) (default 4.8s)
       --datastore-gc-interval duration                                                  amount of time between passes of garbage collection (Postgres driver only) (default 3m0s)

@@ -28,6 +28,7 @@ import (
 func TestBurst(t *testing.T) {
 	blacklist := []string{
 		spanner.Engine, // spanner emulator doesn't support parallel transactions
+		"mongodb",      // requires external MongoDB instance
 	}
 
 	for _, engine := range datastore.Engines {

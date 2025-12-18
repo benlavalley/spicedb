@@ -49,6 +49,7 @@ var skipped = []string{
 	postgres.Engine,
 	mysql.Engine,
 	"memory",
+	"mongodb", // Requires external MongoDB instance
 }
 
 var sortOrders = map[string]options.SortOrder{

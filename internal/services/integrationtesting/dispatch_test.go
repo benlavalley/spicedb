@@ -30,6 +30,7 @@ type testCase struct {
 func TestDispatchIntegration(t *testing.T) {
 	blacklist := []string{
 		spanner.Engine, // spanner emulator doesn't support parallel transactions
+		"mongodb",      // requires external MongoDB instance
 	}
 
 	testCases := []testCase{
