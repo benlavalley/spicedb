@@ -80,6 +80,13 @@ func (r *mongoDBReader) QueryRelationships(
 		})
 	}
 
+	// Apply index hint based on query shape
+	if indexHint := IndexingHintForQueryShape(queryOpts.QueryShape); indexHint != nil {
+		if hint, ok := indexHint.(forcedIndex); ok {
+			findOpts.SetHint(hint.IndexName())
+		}
+	}
+
 	// Handle cursor (after)
 	if queryOpts.After != nil {
 		cursorFilter := r.buildCursorFilter(queryOpts.After, queryOpts.Sort)
@@ -170,6 +177,13 @@ func (r *mongoDBReader) ReverseQueryRelationships(
 	findOpts := mongooptions.Find()
 	if queryOpts.LimitForReverse != nil {
 		findOpts.SetLimit(int64(*queryOpts.LimitForReverse))
+	}
+
+	// Apply index hint based on query shape for reverse queries
+	if indexHint := IndexingHintForQueryShape(queryOpts.QueryShapeForReverse); indexHint != nil {
+		if hint, ok := indexHint.(forcedIndex); ok {
+			findOpts.SetHint(hint.IndexName())
+		}
 	}
 
 	col := r.database.Collection(colRelationships)
