@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
@@ -17,6 +19,44 @@ import (
 )
 
 var testDBCounter uint64
+
+// cleanupLeftoverTestDatabases removes any leftover test databases from previous runs.
+// This is useful when tests timeout or panic and don't clean up after themselves.
+func cleanupLeftoverTestDatabases(t *testing.T, baseURI string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	clientOpts := options.Client().ApplyURI(baseURI)
+	client, err := mongo.Connect(clientOpts)
+	if err != nil {
+		t.Logf("Warning: could not connect to cleanup leftover databases: %v", err)
+		return
+	}
+	defer func() { _ = client.Disconnect(ctx) }()
+
+	// List all databases
+	result, err := client.ListDatabaseNames(ctx, bson.M{})
+	if err != nil {
+		t.Logf("Warning: could not list databases for cleanup: %v", err)
+		return
+	}
+
+	// Drop any databases that match the test database pattern
+	var dropped int
+	for _, dbName := range result {
+		if strings.HasPrefix(dbName, "spicedb_test_") {
+			if err := client.Database(dbName).Drop(ctx); err != nil {
+				t.Logf("Warning: could not drop leftover database %s: %v", dbName, err)
+			} else {
+				dropped++
+			}
+		}
+	}
+
+	if dropped > 0 {
+		t.Logf("Cleaned up %d leftover test database(s)", dropped)
+	}
+}
 
 type mongoDBTest struct {
 	baseURI string
@@ -105,6 +145,10 @@ func TestMongoDBDatastore(t *testing.T) {
 	if uri == "" {
 		t.Skip("SPICEDB_MONGODB_URI not set, skipping MongoDB tests")
 	}
+
+	// Clean up any leftover test databases from previous runs that may have
+	// timed out or panicked without proper cleanup
+	cleanupLeftoverTestDatabases(t, uri)
 
 	tester := mongoDBTest{baseURI: uri}
 
