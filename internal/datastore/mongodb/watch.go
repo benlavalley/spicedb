@@ -11,6 +11,7 @@ import (
 	mongooptions "go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/authzed/spicedb/internal/datastore/common"
 	"github.com/authzed/spicedb/internal/datastore/revisions"
 	"github.com/authzed/spicedb/pkg/datastore"
 	core "github.com/authzed/spicedb/pkg/proto/core/v1"
@@ -156,6 +157,10 @@ func (m *mongoDBDatastore) watchChanges(
 	// CockroachDB uses "resolved" timestamps and Spanner uses heartbeat timestamps.
 	confirmedRevision := *lastRevision
 
+	// Create a change tracker for deduplication and byte-size tracking.
+	// This matches the pattern used by CockroachDB and PostgreSQL datastores.
+	tracked := common.NewChanges(revisions.TimestampIDKeyFunc, options.Content, options.MaximumBufferedChangesByteSize)
+
 	// Process change stream events with periodic checkpoint emission
 	for {
 		// Check for context cancellation first
@@ -191,22 +196,33 @@ func (m *mongoDBDatastore) watchChanges(
 				continue
 			}
 
-			// Convert to datastore.RevisionChanges
-			change, err := convertChangelogDoc(&doc, revision)
-			if err != nil {
-				return fmt.Errorf("failed to convert changelog: %w", err)
-			}
-
-			// Filter by content type
-			filteredChange := filterChangeByContent(change, options.Content)
-			if filteredChange != nil {
-				if !sendChange(*filteredChange) {
-					return errWatchDisconnected
-				}
+			// Add changes to the tracker for deduplication and byte-size tracking.
+			// This matches the pattern used by CockroachDB and PostgreSQL.
+			if err := addChangelogDocToTracker(ctx, tracked, &doc, revision); err != nil {
+				return err
 			}
 
 			*lastRevision = revision
 			confirmedRevision = revision
+
+			// Extract deduplicated changes and send them, then emit checkpoint if requested.
+			// FilterAndRemoveRevisionChanges returns changes where revision < bound, so we need to
+			// pass a bound that's greater than the current revision to include it.
+			// Adding 1 nanosecond ensures we include the current revision.
+			boundRevision := revisions.NewForTimestamp(revision.TimestampNanoSec() + 1)
+			filtered, err := tracked.FilterAndRemoveRevisionChanges(revisions.TimestampIDKeyLessThanFunc, boundRevision)
+			if err != nil {
+				return err
+			}
+
+			for _, change := range filtered {
+				filteredChange := filterChangeByContent(change, options.Content)
+				if filteredChange != nil {
+					if !sendChange(*filteredChange) {
+						return errWatchDisconnected
+					}
+				}
+			}
 
 			// Send checkpoint after data change if requested
 			if requestedCheckpoints {
@@ -406,4 +422,85 @@ func convertChangelogDoc(doc *changelogDoc, revision revisions.TimestampRevision
 	}
 
 	return result, nil
+}
+
+// addChangelogDocToTracker adds changes from a changelog document to the change tracker.
+// This enables deduplication and byte-size tracking matching the pattern used by
+// CockroachDB and PostgreSQL datastores.
+func addChangelogDocToTracker(
+	ctx context.Context,
+	tracked *common.Changes[revisions.TimestampRevision, int64],
+	doc *changelogDoc,
+	revision revisions.TimestampRevision,
+) error {
+	// Add relationship changes
+	for _, relDoc := range doc.Changes.RelationshipChanges {
+		update, err := relDoc.ToRelationshipUpdate()
+		if err != nil {
+			return fmt.Errorf("failed to convert relationship update: %w", err)
+		}
+
+		// Normalize CREATE to TOUCH for Watch API consistency
+		op := update.Operation
+		if op == tuple.UpdateOperationCreate {
+			op = tuple.UpdateOperationTouch
+		}
+
+		if err := tracked.AddRelationshipChange(ctx, revision, update.Relationship, op); err != nil {
+			return err
+		}
+	}
+
+	// Add namespace changes
+	for _, nsDoc := range doc.Changes.ChangedNamespaces {
+		if len(nsDoc.Definition) > 0 {
+			ns := &core.NamespaceDefinition{}
+			if err := ns.UnmarshalVT(nsDoc.Definition); err != nil {
+				return fmt.Errorf("failed to unmarshal namespace definition: %w", err)
+			}
+			if err := tracked.AddChangedDefinition(ctx, revision, ns); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add caveat changes
+	for _, caveatDoc := range doc.Changes.ChangedCaveats {
+		if len(caveatDoc.Definition) > 0 {
+			caveat := &core.CaveatDefinition{}
+			if err := caveat.UnmarshalVT(caveatDoc.Definition); err != nil {
+				return fmt.Errorf("failed to unmarshal caveat definition: %w", err)
+			}
+			if err := tracked.AddChangedDefinition(ctx, revision, caveat); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add deleted namespaces
+	for _, nsName := range doc.Changes.DeletedNamespaces {
+		if err := tracked.AddDeletedNamespace(ctx, revision, nsName); err != nil {
+			return err
+		}
+	}
+
+	// Add deleted caveats
+	for _, caveatName := range doc.Changes.DeletedCaveats {
+		if err := tracked.AddDeletedCaveat(ctx, revision, caveatName); err != nil {
+			return err
+		}
+	}
+
+	// Add metadata if present
+	if len(doc.Changes.Metadata) > 0 {
+		metadataMap := make(map[string]any)
+		for k, v := range doc.Changes.Metadata {
+			metadataMap[k] = v
+		}
+		if err := tracked.AddRevisionMetadata(ctx, revision, metadataMap); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
