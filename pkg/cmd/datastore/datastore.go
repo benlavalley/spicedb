@@ -14,6 +14,7 @@ import (
 
 	"github.com/authzed/spicedb/internal/datastore/crdb"
 	"github.com/authzed/spicedb/internal/datastore/memdb"
+	"github.com/authzed/spicedb/internal/datastore/mongodb"
 	"github.com/authzed/spicedb/internal/datastore/mysql"
 	"github.com/authzed/spicedb/internal/datastore/postgres"
 	"github.com/authzed/spicedb/internal/datastore/proxy"
@@ -38,6 +39,7 @@ const (
 	CockroachEngine = "cockroachdb"
 	SpannerEngine   = "spanner"
 	MySQLEngine     = "mysql"
+	MongoDBEngine   = "mongodb"
 )
 
 var BuilderForEngine = map[string]engineBuilderFunc{
@@ -46,6 +48,7 @@ var BuilderForEngine = map[string]engineBuilderFunc{
 	MemoryEngine:    newMemoryDatstore,
 	SpannerEngine:   newSpannerDatastore,
 	MySQLEngine:     newMySQLDatastore,
+	MongoDBEngine:   newMongoDBDatastore,
 }
 
 //go:generate go run github.com/ecordell/optgen -output zz_generated.connpool.options.go . ConnPoolConfig
@@ -807,4 +810,21 @@ func newMemoryDatstore(_ context.Context, opts Config) (datastore.Datastore, err
 
 	log.Warn().Msg("in-memory datastore is not persistent and not feasible to run in a high availability fashion")
 	return memdb.NewMemdbDatastore(opts.WatchBufferLength, opts.RevisionQuantization, opts.GCWindow)
+}
+
+func newMongoDBDatastore(ctx context.Context, opts Config) (datastore.Datastore, error) {
+	if len(opts.ReadReplicaURIs) > 0 {
+		return nil, errors.New("read replicas are not supported for the MongoDB datastore engine")
+	}
+
+	log.Warn().Msg("MongoDB datastore is intended for development use only")
+	return mongodb.NewMongoDBDatastore(
+		ctx,
+		opts.URI,
+		mongodb.GCWindow(opts.GCWindow),
+		mongodb.RevisionQuantization(opts.RevisionQuantization),
+		mongodb.WatchBufferLength(opts.WatchBufferLength),
+		mongodb.WatchBufferWriteTimeout(opts.WatchBufferWriteTimeout),
+		mongodb.MaxRevisionStalenessPercent(opts.MaxRevisionStalenessPercent),
+	)
 }

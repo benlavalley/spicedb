@@ -5,6 +5,7 @@ package integrationtesting_test
 import (
 	"path"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -35,7 +36,14 @@ func TestConsistencyPerDatastore(t *testing.T) { //nolint:tparallel
 		path.Join(path.Join(path.Dir(filename), "testconfigs"), "intersectionarrow.yaml"),
 	}
 
+	blacklist := []string{
+		"mongodb", // requires external MongoDB instance
+	}
+
 	for _, engineID := range datastore.Engines {
+		if slices.Contains(blacklist, engineID) {
+			continue
+		}
 		t.Run(engineID, func(t *testing.T) {
 			// FIXME errors arise if spanner is run in parallel
 			if engineID != "spanner" {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -42,7 +43,14 @@ func TestNonMemdbSteelThreads(t *testing.T) {
 		t.Skip("Skipping non-memdb steelthread tests in regenerate mode")
 	}
 
+	blacklist := []string{
+		"mongodb", // requires external MongoDB instance
+	}
+
 	for _, engineID := range datastore.SortedEngineIDs() {
+		if slices.Contains(blacklist, engineID) {
+			continue
+		}
 		t.Run(engineID, func(t *testing.T) {
 			rde := testdatastore.RunDatastoreEngine(t, engineID)
 

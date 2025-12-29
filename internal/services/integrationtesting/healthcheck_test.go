@@ -4,6 +4,7 @@ package integrationtesting_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -23,7 +24,14 @@ import (
 )
 
 func TestHealthCheck(t *testing.T) {
+	blacklist := []string{
+		"mongodb", // requires external MongoDB instance
+	}
+
 	for _, engine := range datastore.Engines {
+		if slices.Contains(blacklist, engine) {
+			continue
+		}
 		b := testdatastore.RunDatastoreEngine(t, engine)
 		t.Run(engine, func(t *testing.T) {
 			require := require.New(t)
